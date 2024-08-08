@@ -72,6 +72,7 @@ contract PuppyRaffle is ERC721, Ownable {
         rarityToName[LEGENDARY_RARITY] = LEGENDARY;
     }
 
+    //q we are not updating the totalFees var
     /// @notice this is how players enter the raffle
     /// @notice they have to pay the entrance fee * the number of players
     /// @notice duplicate entrants are not allowed
@@ -91,6 +92,8 @@ contract PuppyRaffle is ERC721, Ownable {
         emit RaffleEnter(newPlayers);
     }
 
+    //q make it non-Reentrant
+    //q set the state change before the external call
     /// @param playerIndex the index of the player to refund. You can find it externally by calling `getActivePlayerIndex`
     /// @dev This function will allow there to be blank spots in the array
     function refund(uint256 playerIndex) public {
@@ -104,6 +107,7 @@ contract PuppyRaffle is ERC721, Ownable {
         emit RaffleRefunded(playerAddress);
     }
 
+    //q for better gasEfficieny make it a mapping
     /// @notice a way to get the index in the array
     /// @param player the address of a player in the raffle
     /// @return the index of the player in the array, if they are not active, it returns 0
@@ -116,6 +120,7 @@ contract PuppyRaffle is ERC721, Ownable {
         return 0;
     }
 
+    //q since this sol version is <0.8 we have to manually check for over and underflows
     /// @notice this function will select a winner and mint a puppy
     /// @notice there must be at least 4 players, and the duration has occurred
     /// @notice the previous winner is stored in the previousWinner variable
@@ -153,6 +158,8 @@ contract PuppyRaffle is ERC721, Ownable {
         _safeMint(winner, tokenId);
     }
 
+    //q the constraint of balance == totalFees ;  means withdrawal can only occur right after a winner has been selected and totalFee is made equal to balance; and before any new players have entered
+    //q why?
     /// @notice this function will withdraw the fees to the feeAddress
     function withdrawFees() external {
         require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
