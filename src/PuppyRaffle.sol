@@ -54,6 +54,7 @@ contract PuppyRaffle is ERC721, Ownable {
     event RaffleRefunded(address player);
     event FeeAddressChanged(address newFeeAddress);
 
+    //q no zero address checks
     /// @param _entranceFee the cost in wei to enter the raffle
     /// @param _feeAddress the address to send the fees to
     /// @param _raffleDuration the duration in seconds of the raffle
@@ -83,6 +84,7 @@ contract PuppyRaffle is ERC721, Ownable {
             players.push(newPlayers[i]);
         }
 
+        //@audit is a DoS vector
         // Check for duplicates
         for (uint256 i = 0; i < players.length - 1; i++) {
             for (uint256 j = i + 1; j < players.length; j++) {
@@ -107,7 +109,7 @@ contract PuppyRaffle is ERC721, Ownable {
         emit RaffleRefunded(playerAddress);
     }
 
-    //q for better gasEfficieny make it a mapping
+    //i for better gasEfficieny make it a mapping
     /// @notice a way to get the index in the array
     /// @param player the address of a player in the raffle
     /// @return the index of the player in the array, if they are not active, it returns 0
@@ -117,6 +119,9 @@ contract PuppyRaffle is ERC721, Ownable {
                 return i;
             }
         }
+
+        //q what is the player is at index 0?
+        //@audit if the player is at index 0 then it will return 0 making them think that the player is not active
         return 0;
     }
 
