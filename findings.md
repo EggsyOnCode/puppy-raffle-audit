@@ -112,3 +112,46 @@ H
 - follow CEI pattern and reset player address to zero before making the external call 
 OR
 - use Reentrancy Guard form OZ
+
+# 3
+
+## [H-#] TITLE (Root Cause + Impact)
+
+Weak RNG in the selectWinner func
+
+## Description:
+
+Weak Randomness in the `PuppyRaffle::selectWinner` method; random numbers are being produced by deterministic figures or influenceable figures like block.difficulty by miners
+
+## Impact:
+
+See `MeeBits` Attack
+
+## Proof of Concept:
+
+## Recommended Mitigation:
+
+- Using off-chian distributed RNG via Chainlink VRF or commit-reveal schemes
+
+# 4
+
+
+## [M-#] TITLE (Root Cause + Impact)
+
+Possible Integer Overflow in `PuppyRaffle:selectWinner` due to `totalFees` being uint64 (max value being 18446744073709551615); this would rollBack our fees to a smaller number makign hte protoocl loose funds
+
+## Description:
+
+`PuppyRaffle::totalFees` is uint64 with max value being 18446744073709551615 (18.something ETH) ; if we get a few more ETH as fees it would rollback to say 1 ETH making us loose 20ETH!!!! from fees
+
+
+## Impact:
+
+Could be huge probabilisitcally if hte totalFees are too high!
+
+
+## Proof of Concept:
+
+## Recommended Mitigation:
+
+- Use uint256 for totalFees and ^0.8.0 compiler for overflow / underflow attacks
