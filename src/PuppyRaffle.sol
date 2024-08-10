@@ -54,7 +54,7 @@ contract PuppyRaffle is ERC721, Ownable {
     event RaffleRefunded(address player);
     event FeeAddressChanged(address newFeeAddress);
 
-    //q no zero address checks
+    //@audit no zero address checks (I: L)
     /// @param _entranceFee the cost in wei to enter the raffle
     /// @param _feeAddress the address to send the fees to
     /// @param _raffleDuration the duration in seconds of the raffle
@@ -73,12 +73,12 @@ contract PuppyRaffle is ERC721, Ownable {
         rarityToName[LEGENDARY_RARITY] = LEGENDARY;
     }
 
-    //q we are not updating the totalFees var
     /// @notice this is how players enter the raffle
     /// @notice they have to pay the entrance fee * the number of players
     /// @notice duplicate entrants are not allowed
     /// @param newPlayers the list of players to enter the raffle
     function enterRaffle(address[] memory newPlayers) public payable {
+        //@audit assert the length shouldn't be Zero
         require(msg.value == entranceFee * newPlayers.length, "PuppyRaffle: Must send enough to enter raffle");
         for (uint256 i = 0; i < newPlayers.length; i++) {
             players.push(newPlayers[i]);
@@ -94,8 +94,7 @@ contract PuppyRaffle is ERC721, Ownable {
         emit RaffleEnter(newPlayers);
     }
 
-    //q make it non-Reentrant
-    //q set the state change before the external call
+    //@audit make it non-Reentrant
     /// @param playerIndex the index of the player to refund. You can find it externally by calling `getActivePlayerIndex`
     /// @dev This function will allow there to be blank spots in the array
     function refund(uint256 playerIndex) public {
@@ -125,7 +124,7 @@ contract PuppyRaffle is ERC721, Ownable {
         return 0;
     }
 
-    //q since this sol version is <0.8 we have to manually check for over and underflows
+    //@audit since this sol version is <0.8 we have to manually check for over and underflows
     /// @notice this function will select a winner and mint a puppy
     /// @notice there must be at least 4 players, and the duration has occurred
     /// @notice the previous winner is stored in the previousWinner variable
@@ -136,7 +135,6 @@ contract PuppyRaffle is ERC721, Ownable {
         require(block.timestamp >= raffleStartTime + raffleDuration, "PuppyRaffle: Raffle not over");
         require(players.length >= 4, "PuppyRaffle: Need at least 4 players");
 
-        //q is this truly random??
         // fixes: Use Chainlink VRF or a commit-reveal scheme
         uint256 winnerIndex =
             uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty))) % players.length;
@@ -149,6 +147,11 @@ contract PuppyRaffle is ERC721, Ownable {
         uint256 tokenId = totalSupply();
 
         // We use a different RNG calculate from the winnerIndex to determine rarity
+
+        //@followup if the msg.sender deosn't like the rarity being determined; they can revert the tx
+        // causing gas wars (lots of revereted tx until the desired rarity is achieved)
+
+        //@audit the RNG is not very random ; use a differnt RNG
         uint256 rarity = uint256(keccak256(abi.encodePacked(msg.sender, block.difficulty))) % 100;
         if (rarity <= COMMON_RARITY) {
             tokenIdToRarity[tokenId] = COMMON_RARITY;
@@ -161,15 +164,23 @@ contract PuppyRaffle is ERC721, Ownable {
         delete players;
         raffleStartTime = block.timestamp;
         previousWinner = winner;
+
+        // we are making after the external call
+        // possible reentrancy issue if the winenr is a smart contract
+        //e the requires at the start of the func could prevent reentrancy by checking the players' array lenght (which should be 0 sicne we just deleted them)
+        // && the raffleStartTime (which should be the current block.timestamp)
         (bool success,) = winner.call{value: prizePool}("");
         require(success, "PuppyRaffle: Failed to send prize pool to winner");
         _safeMint(winner, tokenId);
     }
 
-    //q the constraint of balance == totalFees ;  means withdrawal can only occur right after a winner has been selected and totalFee is made equal to balance; and before any new players have entered
-    //q why?
+    //@audit the constraint of balance == totalFees ;  means withdrawal can only occur right after a winner has been selected and totalFee is made equal to balance; and before any new players have entered
     /// @notice this function will withdraw the fees to the feeAddress
+    //@followup shouldn't we be emititng events for these functiosn?
     function withdrawFees() external {
+        //q if the raffle has players (say the first raffle has ended and the next has just begun and one player has entered) the fees can't be withdrawn
+        //@followup was it designed to work like this?
+        //@audit the withdraw fees could be rendered insolvent if the raffle received external ether from a foreced selfdestruct from an attacker contract
         require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
         uint256 feesToWithdraw = totalFees;
         totalFees = 0;
@@ -184,6 +195,7 @@ contract PuppyRaffle is ERC721, Ownable {
         emit FeeAddressChanged(newFeeAddress);
     }
 
+    //@follwup this function isn't used in the contract?
     /// @notice this function will return true if the msg.sender is an active player
     function _isActivePlayer() internal view returns (bool) {
         for (uint256 i = 0; i < players.length; i++) {

