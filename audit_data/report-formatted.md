@@ -1,29 +1,40 @@
----
-title: PuppyRaffle Audit Report
-author: EggsyOnCode
-date: Aug 10, 2024
-header-includes:
-  - \usepackage{titling}
-  - \usepackage{graphicx}
----
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    .full-page {
+        width:  100%;
+        height:  100vh; /* This will make the div take up the full viewport height */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    .full-page img {
+        max-width:  200;
+        max-height:  200;
+        margin-bottom: 5rem;
+    }
+    .full-page div{
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+</style>
+</head>
+<body>
 
-\begin{titlepage}
-\centering
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.5\textwidth]{logo.pdf}
-\end{figure}
-\vspace\*{2cm}
-{\Huge\bfseries Protocol Audit Report\par}
-\vspace{1cm}
-{\Large Version 1.0\par}
-\vspace{2cm}
-\vfill
-{\large \today\par}
-\end{titlepage}
+<div class="full-page">
+    <img src="./guts.jpeg" alt="Logo">
+    <div>
+    <h1>Protocol Audit Report</h1>
+    <h3>Prepared by: EggsyOnCode</h3>
+    </div>
+</div>
 
-\maketitle
-
+</body>
+</html>
 <!-- Your report starts here! -->
 
 Prepared by: [EggysOnCode](https://github.com/eggsyoncode)
